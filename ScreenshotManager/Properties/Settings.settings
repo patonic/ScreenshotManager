@@ -1,0 +1,63 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="ScreenshotManager.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="dbPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)">db.db</Value>
+    </Setting>
+    <Setting Name="fullScreenshotKey" Type="System.String" Scope="User">
+      <Value Profile="(Default)">G</Value>
+    </Setting>
+    <Setting Name="activeScreenshotKey" Type="System.String" Scope="User">
+      <Value Profile="(Default)">F</Value>
+    </Setting>
+    <Setting Name="textKey" Type="System.String" Scope="User">
+      <Value Profile="(Default)">T</Value>
+    </Setting>
+    <Setting Name="audioKey" Type="System.String" Scope="User">
+      <Value Profile="(Default)">A</Value>
+    </Setting>
+    <Setting Name="textStub" Type="System.String" Scope="User">
+      <Value Profile="(Default)">*ПОДОЖДИТЕ ЗАГРУЗКИ*</Value>
+    </Setting>
+    <Setting Name="loadRadius" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
+    <Setting Name="fullScreenshotShift" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="fullScreenshotCtrl" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="fullScreenshotAlt" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="activeScreenshotShift" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="activeScreenshotCtrl" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="activeScreenshotAlt" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="audioShift" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="audioCtrl" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="audioAlt" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="textShift" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="textCtrl" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="textAlt" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>
