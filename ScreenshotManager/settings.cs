@@ -15,6 +15,8 @@ namespace ScreenshotManager
     {
         SQLiteConnection connection = null;
         string[] keys = new string[] { "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "[", "]", "A", "S", "D", "F", "G", "H", "J", "K", "L", ";", "'", "Z", "X", "C", "V", "B", "N", "M", ",", ".", "/", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12" };
+        Microsoft.Win32.RegistryKey regKey;
+        bool admin = true;
 
         public settings(SQLiteConnection connection)
         {
@@ -24,6 +26,18 @@ namespace ScreenshotManager
 
         private void settings_Load(object sender, EventArgs e)
         {
+            try
+            {
+                regKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run\\", true);
+                if (regKey.GetValue("ScreenshotManager") != null)
+                    autoStartCheckBox.Checked = true;
+            }
+            catch (Exception)
+            {
+                admin = false;
+                autoStartCheckBox.Enabled = false;
+            }
+
             fullScreenshotShiftCheckBox.Checked = Properties.Settings.Default.fullScreenshotShift;
             fullScreenshotCtrlСheckBox.Checked = Properties.Settings.Default.fullScreenshotCtrl;
             fullScreenshotAltСheckBox.Checked = Properties.Settings.Default.fullScreenshotAlt;
@@ -42,6 +56,14 @@ namespace ScreenshotManager
             textKeyComboBox.Items.AddRange(keys);
             textKeyComboBox.SelectedIndex = Array.IndexOf(keys, Properties.Settings.Default.textKey);
 
+            imageFormatComboBox.DataSource = Enum.GetValues(typeof(ScreenCapture.imageFormats));
+            imageFormatComboBox.SelectedItem = (ScreenCapture.imageFormats)Properties.Settings.Default.imageFormat;
+            jpgQualityNumericUpDown.Value = Properties.Settings.Default.qualityJpeg;
+            if ((ScreenCapture.imageFormats)imageFormatComboBox.SelectedItem != ScreenCapture.imageFormats.jpg)
+                jpgQualityNumericUpDown.Enabled = false;
+
+            startInTrayCheckBox.Checked = Properties.Settings.Default.startInTray;
+
             audioShiftCheckBox.Checked = Properties.Settings.Default.audioShift;
             audioCtrlCheckBox.Checked = Properties.Settings.Default.audioCtrl;
             audioAltCheckBox.Checked = Properties.Settings.Default.audioAlt;
@@ -56,6 +78,17 @@ namespace ScreenshotManager
 
         private void submitButton_Click(object sender, EventArgs e)
         {
+            if (admin) 
+            {
+                if (autoStartCheckBox.Checked)
+                    regKey.SetValue("ScreenshotManager", Application.ExecutablePath);
+                else
+                    regKey.DeleteValue("ScreenshotManager", false);
+            }
+            Properties.Settings.Default.startInTray = startInTrayCheckBox.Checked;
+
+
+
             Properties.Settings.Default.fullScreenshotShift = fullScreenshotShiftCheckBox.Checked;
             Properties.Settings.Default.fullScreenshotCtrl = fullScreenshotCtrlСheckBox.Checked;
             Properties.Settings.Default.fullScreenshotAlt = fullScreenshotAltСheckBox.Checked;
@@ -70,6 +103,9 @@ namespace ScreenshotManager
             Properties.Settings.Default.textCtrl = textCtrlCheckBox.Checked;
             Properties.Settings.Default.textAlt = textAltCheckBox.Checked;
             Properties.Settings.Default.textKey = keys[textKeyComboBox.SelectedIndex];
+
+            Properties.Settings.Default.imageFormat = (int)imageFormatComboBox.SelectedItem;
+            Properties.Settings.Default.qualityJpeg = (byte)jpgQualityNumericUpDown.Value;
 
             Properties.Settings.Default.audioShift = audioShiftCheckBox.Checked;
             Properties.Settings.Default.audioCtrl = audioCtrlCheckBox.Checked;
@@ -116,6 +152,14 @@ namespace ScreenshotManager
                 this.Close();
             }
             Application.Restart();
+        }
+
+        private void imageFormatComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if ((ScreenCapture.imageFormats)imageFormatComboBox.SelectedItem == ScreenCapture.imageFormats.jpg)
+                jpgQualityNumericUpDown.Enabled = true;
+            else
+                jpgQualityNumericUpDown.Enabled = false;
         }
     }
 }

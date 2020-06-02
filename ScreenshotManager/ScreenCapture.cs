@@ -8,6 +8,8 @@ namespace ScreenshotManager
 {
     public class ScreenCapture
     {
+        public enum imageFormats { bmp, png, gif, jpg };
+
         [DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
@@ -26,7 +28,7 @@ namespace ScreenshotManager
         [DllImport("user32.dll")]
         private static extern IntPtr GetWindowRect(IntPtr hWnd, ref Rect rect);
 
-        public static void CaptureDesktop(string path)
+        public static void CaptureDesktop(string path, imageFormats format = imageFormats.png, byte qualityJpeg = 100)
         {
             int screenLeft = int.MaxValue;
             int screenTop = int.MaxValue;
@@ -53,25 +55,17 @@ namespace ScreenshotManager
                     break;
             }
 
-            using (Bitmap bmp = new Bitmap(screenRight - screenLeft, screenBottom - screenTop))
-            {
-                using (Graphics g = Graphics.FromImage(bmp))
-                    g.CopyFromScreen(screenLeft, screenTop, 0, 0, bmp.Size);
+            Bitmap bmp = new Bitmap(screenRight - screenLeft, screenBottom - screenTop);
+            using (Graphics g = Graphics.FromImage(bmp))
+                g.CopyFromScreen(screenLeft, screenTop, 0, 0, bmp.Size);
 
-                bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
-            }
+            saveToFile(ref bmp, path, format, qualityJpeg);
         }
 
-        public static void CaptureActiveWindow(string path)
-        {
-            CaptureWindow(GetForegroundWindow(), path);
-        }
-
-        
-        public static void CaptureWindow(IntPtr handle, string path)
+        public static void CaptureActiveWindow(string path, imageFormats format = imageFormats.png, byte qualityJpeg = 90)
         {
             Rect rect = new Rect();
-            GetWindowRect(handle, ref rect);
+            GetWindowRect(GetForegroundWindow(), ref rect);
             Rectangle bounds = new Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
             Bitmap bmp = new Bitmap(bounds.Width, bounds.Height);
 
@@ -80,7 +74,41 @@ namespace ScreenshotManager
                 graphics.CopyFromScreen(new Point(bounds.Left, bounds.Top), Point.Empty, bounds.Size);
             }
 
-            bmp.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+            saveToFile(ref bmp, path, format, qualityJpeg);
+        }
+
+        private static void saveToFile(ref Bitmap bmp, string path, imageFormats format, byte qualityJpeg = 90)
+        {
+            switch (format)
+            {
+                case imageFormats.bmp:
+                    bmp.Save(path, ImageFormat.Bmp);
+                    break;
+                case imageFormats.png:
+                    bmp.Save(path, ImageFormat.Png);
+                    break;
+                case imageFormats.gif:
+                    bmp.Save(path, ImageFormat.Gif);
+                    break;
+                case imageFormats.jpg:
+                    EncoderParameters encoderParameters = new EncoderParameters(1);
+                    encoderParameters.Param[0] = new EncoderParameter(Encoder.Quality, (Int64)qualityJpeg);
+                    bmp.Save(path, GetEncoder(ImageFormat.Jpeg), encoderParameters);
+                    break;
+            }
+        }
+
+        private static ImageCodecInfo GetEncoder(ImageFormat format)
+        {
+            var codecs = ImageCodecInfo.GetImageDecoders();
+            foreach (var codec in codecs)
+            {
+                if (codec.FormatID == format.Guid)
+                {
+                    return codec;
+                }
+            }
+            return null;
         }
 
         class NativeUtilities

@@ -62,7 +62,7 @@ namespace ScreenshotManager
                 return;
             }
 
-            SetProcessDPIAware();
+            //SetProcessDPIAware();
             InitializeComponent();
 
             connection = new SQLiteConnection("Data Source="+Properties.Settings.Default.dbPath+";Version=3;");
@@ -81,7 +81,11 @@ namespace ScreenshotManager
             gkhInstall();
         }
 
-        
+        private void main_Shown(object sender, EventArgs e)
+        {
+            if (Properties.Settings.Default.startInTray)
+                formToTrey(true);
+        }
 
         #region toolStrip
         private void exitToolStripMenuItem_Click(object sender, EventArgs e)
@@ -201,9 +205,9 @@ namespace ScreenshotManager
         }
 
         private void createFullScreenshot() {
-            string name = DateTime.Now.ToString("dd-MM-yyyy HH-mm-ss") + " - " + (Int32.Parse((new SQLiteCommand("SELECT last_insert_rowid()", connection).ExecuteScalar()).ToString()) + 1) + ".png";
+            string name = DateTime.Now.ToString("dd-MM-yyyy HH-mm-ss") + " - " + (Int32.Parse((new SQLiteCommand("SELECT last_insert_rowid()", connection).ExecuteScalar()).ToString()) + 1) + "." + ((ScreenCapture.imageFormats)Properties.Settings.Default.imageFormat).ToString();
 
-            ScreenCapture.CaptureDesktop(@"content\" + name);
+            ScreenCapture.CaptureDesktop(@"content\" + name, (ScreenCapture.imageFormats)Properties.Settings.Default.imageFormat, Properties.Settings.Default.qualityJpeg);
 
             SQLiteCommand insert = new SQLiteCommand("INSERT INTO files (date, name, type) VALUES (@date, @name, @type)", connection);
             insert.Parameters.AddWithValue("@date", DateTime.Now);
@@ -218,9 +222,9 @@ namespace ScreenshotManager
         }
 
         private void activeScreenshot() {
-            string name = DateTime.Now.ToString("dd-MM-yyyy HH-mm-ss") + " - " + (Int32.Parse((new SQLiteCommand("SELECT last_insert_rowid()", connection).ExecuteScalar()).ToString()) + 1) + ".png";
+            string name = DateTime.Now.ToString("dd-MM-yyyy HH-mm-ss") + " - " + (Int32.Parse((new SQLiteCommand("SELECT last_insert_rowid()", connection).ExecuteScalar()).ToString()) + 1) + "." + ((ScreenCapture.imageFormats)Properties.Settings.Default.imageFormat).ToString();
 
-            ScreenCapture.CaptureActiveWindow(@"content\" + name);
+            ScreenCapture.CaptureActiveWindow(@"content\" + name, (ScreenCapture.imageFormats)Properties.Settings.Default.imageFormat, Properties.Settings.Default.qualityJpeg);
 
             SQLiteCommand insert = new SQLiteCommand("INSERT INTO files (date, name, type) VALUES (@date, @name, @type)", connection);
             insert.Parameters.AddWithValue("@date", DateTime.Now);

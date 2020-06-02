@@ -250,5 +250,41 @@ namespace ScreenshotManager.Properties {
                 this["textAlt"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool startInTray {
+            get {
+                return ((bool)(this["startInTray"]));
+            }
+            set {
+                this["startInTray"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public int imageFormat {
+            get {
+                return ((int)(this["imageFormat"]));
+            }
+            set {
+                this["imageFormat"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("90")]
+        public byte qualityJpeg {
+            get {
+                return ((byte)(this["qualityJpeg"]));
+            }
+            set {
+                this["qualityJpeg"] = value;
+            }
+        }
     }
 }
