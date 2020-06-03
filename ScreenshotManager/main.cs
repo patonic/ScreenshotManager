@@ -7,6 +7,7 @@ using System.Data.SQLite;
 using System.IO;
 using NAudio.Wave;
 using System.Diagnostics;
+using System.Data.Entity.Core.Metadata.Edm;
 
 namespace ScreenshotManager
 {
@@ -15,8 +16,8 @@ namespace ScreenshotManager
         WaveIn waveIn;
         WaveFileWriter writer;
         bool audioWritting = false;
+        List<Int32> activeTags = new List<int>();
 
-        bool rowBuilding = false;
 
         #region globalKeyboardHook
         KeyboardHook kh = new KeyboardHook(true);
@@ -62,10 +63,9 @@ namespace ScreenshotManager
                 return;
             }
 
-            //SetProcessDPIAware();
             InitializeComponent();
 
-            connection = new SQLiteConnection("Data Source="+Properties.Settings.Default.dbPath+";Version=3;");
+            connection = new SQLiteConnection("Data Source="+Properties.Settings.Default.dbPath+ ";Version=3; foreign keys=true;");
             connection.Open();
 
             if (!Directory.Exists(@"content")) {
@@ -77,8 +77,14 @@ namespace ScreenshotManager
 
         private void main_Load(object sender, EventArgs e)
         {
-            loadList();
+            dateToolStripMenuItem.Checked = Properties.Settings.Default.dateRowDisplaying;
+            tagsToolStripMenuItem.Checked = Properties.Settings.Default.tagsRowDisplaying;
+
             gkhInstall();
+            if (Properties.Settings.Default.startInTray)
+                return;
+            loadTreeView();
+            loadList();
         }
 
         private void main_Shown(object sender, EventArgs e)
@@ -135,17 +141,61 @@ namespace ScreenshotManager
         }
         #endregion
 
+        private void loadTreeView()
+        {
+            activeTags.Clear();
+            treeView.Nodes.Clear();
+            treeView.CheckBoxes = true;
+            TreeNode node = new TreeNode("Тип");
+            node.Expand();
+            TreeNode subnode = new TreeNode("Изображение");
+            subnode.Tag = 0;
+            subnode.Checked = true;
+            node.Nodes.Add(subnode);
+            subnode = new TreeNode("Текст");
+            subnode.Tag = 1;
+            subnode.Checked = true;
+            node.Nodes.Add(subnode);
+            subnode = new TreeNode("Аудио");
+            subnode.Tag = 2;
+            subnode.Checked = true;
+            node.Nodes.Add(subnode);
+            treeView.Nodes.Add(node);
+            node = new TreeNode("Теги");
+            node.Expand();
+
+            SQLiteDataReader reader = new SQLiteCommand("SELECT * FROM tags", connection).ExecuteReader();
+            while (reader.Read())
+                node.Nodes.Add(reader["name"].ToString()).Tag = Int32.Parse(reader["id"].ToString());
+            node.Nodes.Add("Добавить тег");
+
+            treeView.Nodes.Add(node);
+        }
+
         private void loadList() {
-            rowBuilding = true;
             dataGridView.Rows.Clear();
-            SQLiteDataReader reader = new SQLiteCommand("SELECT * FROM files ORDER BY id DESC", connection).ExecuteReader();
+            string command = "SELECT * FROM files WHERE (false";
+            foreach (TreeNode item in treeView.Nodes[0].Nodes)
+            {
+                if (item.Checked)
+                    command = string.Format("{0} OR type='{1}'", command, item.Tag);
+            }
+            command = command + ")";
+            foreach (TreeNode item in treeView.Nodes[1].Nodes)
+            {
+                if (item.Checked)
+                    command = string.Format("{0} AND (SELECT COUNT(*) FROM tagsForFile WHERE files.id=tagsForFile.id_files AND tagsForFile.id_tags='{1}')>0", command, item.Tag);
+            }
+            command = command + " ORDER BY id DESC";
+
+            SQLiteDataReader reader = new SQLiteCommand(command, connection).ExecuteReader();
 
             while (reader.Read()) {
                 if (!File.Exists(@"content\" + reader["name"]))
                 {
-                    SQLiteCommand command = new SQLiteCommand("DELETE FROM files WHERE id=@id", connection);
-                    command.Parameters.AddWithValue("@id", reader["id"]);
-                    command.ExecuteNonQuery();
+                    SQLiteCommand deleteCommand = new SQLiteCommand("DELETE FROM files WHERE id=@id", connection);
+                    deleteCommand.Parameters.AddWithValue("@id", reader["id"]);
+                    deleteCommand.ExecuteNonQuery();
                     return;
                 }
 
@@ -157,7 +207,15 @@ namespace ScreenshotManager
                 row.Cells["content"].Value = Properties.Settings.Default.textStub;
             }
 
-            rowBuilding = false;
+            foreach (DataGridViewRow item in dataGridView.Rows)
+            {
+                reader = new SQLiteCommand(string.Format("SELECT tags.name FROM tagsForFile LEFT JOIN tags ON tags.id=tagsForFile.id_tags WHERE tagsForFile.id_files='{0}'", item.Cells["id"].Value), connection).ExecuteReader();
+                string tags = "";
+                while (reader.Read())
+                    tags = string.Format("{0}{1}; ", tags, reader["name"]);
+                dataGridView.Rows[item.Index].Cells["tags"].Value = tags;
+            }
+
             if (dataGridView.Rows.Count > 0) {
                 dataGridView.CurrentCell = null;
                 dataGridView.CurrentCell = dataGridView.Rows[0].Cells["content"];
@@ -182,7 +240,8 @@ namespace ScreenshotManager
 
         private void notifyIcon_MouseClick(object sender, MouseEventArgs e)
         {
-            formToTrey(false);
+            if (e.Button == MouseButtons.Left)
+                formToTrey(false);
         }
 
         private void formToTrey(bool turnOn) {
@@ -216,6 +275,7 @@ namespace ScreenshotManager
             insert.Parameters.AddWithValue("@type", 0);
             
             insert.ExecuteNonQuery();
+            addTagsForLastRow();
             if (this.WindowState != FormWindowState.Minimized)
                 loadList();
             GC.Collect(1, GCCollectionMode.Forced);
@@ -233,6 +293,7 @@ namespace ScreenshotManager
             insert.Parameters.AddWithValue("@type", 0);
 
             insert.ExecuteNonQuery();
+            addTagsForLastRow();
             if (this.WindowState != FormWindowState.Minimized)
                 loadList();
             GC.Collect(1, GCCollectionMode.Forced);
@@ -244,15 +305,16 @@ namespace ScreenshotManager
             if (form.lines != null) {
                 string name = DateTime.Now.ToString("dd-MM-yyyy HH-mm-ss") + " - " + (Int32.Parse((new SQLiteCommand("SELECT last_insert_rowid()", connection).ExecuteScalar()).ToString()) + 1) + ".txt";
 
-                System.IO.File.WriteAllLines(@"content\" + name, form.lines);
+                File.WriteAllLines(@"content\" + name, form.lines);
 
                 SQLiteCommand insert = new SQLiteCommand("INSERT INTO files (date, name, type) VALUES (@date, @name, @type)", connection);
                 insert.Parameters.AddWithValue("@date", DateTime.Now);
 
                 insert.Parameters.AddWithValue("@name", name);
                 insert.Parameters.AddWithValue("@type", 1);
-
+                
                 insert.ExecuteNonQuery();
+                addTagsForLastRow();
                 if (this.WindowState != FormWindowState.Minimized)
                     loadList();
             }
@@ -282,6 +344,7 @@ namespace ScreenshotManager
                     insert.Parameters.AddWithValue("@type", 2);
 
                     insert.ExecuteNonQuery();
+                    addTagsForLastRow();
                     if (this.WindowState != FormWindowState.Minimized)
                         loadList();
                 }
@@ -297,12 +360,20 @@ namespace ScreenshotManager
             }
         }
 
+        private void addTagsForLastRow()
+        {
+            int id = int.Parse(new SQLiteCommand("SELECT last_insert_rowid()", connection).ExecuteScalar().ToString());
+            foreach (int id_tags in activeTags)
+            {
+                SQLiteCommand addTagsForFiles = new SQLiteCommand("INSERT INTO tagsForFile (id_files, id_tags) VALUES (@id_files, @id_tags)", connection);
+                addTagsForFiles.Parameters.AddWithValue("@id_files", id);
+                addTagsForFiles.Parameters.AddWithValue("@id_tags", id_tags);
+                addTagsForFiles.ExecuteNonQuery();
+            }
+        }
+
         private void refreshTimer_Tick(object sender, EventArgs e)
         {
-            /*if (rowBuilding)
-                return;
-            rowBuilding = true;*/
-
             try
             {
                 for (int i = 0; i < dataGridView.Rows.Count; i++)
@@ -353,8 +424,6 @@ namespace ScreenshotManager
             {
                 throw;
             }
-
-            rowBuilding = false;
         }
 
         void waveIn_DataAvailable(object sender, WaveInEventArgs e)
@@ -397,6 +466,24 @@ namespace ScreenshotManager
             }
         }
 
+        private void dataGridView_CellMouseDoubleClick(object sender, DataGridViewCellMouseEventArgs e)
+        {
+            if ((Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 0 || Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 1) && dataGridView.Columns[e.ColumnIndex].Name == "content")
+            {
+                Process.Start(dataGridView.Rows[e.RowIndex].Cells["path"].Value.ToString());
+            }
+            if (Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 2 && dataGridView.Columns[e.ColumnIndex].Name == "content")
+            {
+                if (audioWritting)
+                {
+                    MessageBox.Show("Завершите запись аудио перед началом воспроизведения");
+                    return;
+                }
+
+                Process.Start(dataGridView.Rows[e.RowIndex].Cells["path"].Value.ToString());
+            }
+        }
+
         private void dataGridView_UserDeletingRow(object sender, DataGridViewRowCancelEventArgs e)
         {
             SQLiteCommand del = new SQLiteCommand("DELETE FROM files WHERE id=@id", connection);
@@ -425,5 +512,110 @@ namespace ScreenshotManager
                 }
             }
         }
+
+        private void treeView_DrawNode(object sender, DrawTreeNodeEventArgs e)
+        {
+            if (e.Node.Level == 0 || (treeView.Nodes.Count > 1 && e.Node ==  treeView.Nodes[1].Nodes[treeView.Nodes[1].Nodes.Count-1])) 
+                e.Node.HideCheckBox();
+            e.DrawDefault = true;
+        }
+
+        private void treeView_AfterLabelEdit(object sender, NodeLabelEditEventArgs e)
+        {
+            if (e.Label != null && treeView.Nodes.Count > 1 && e.Node == treeView.Nodes[1].Nodes[treeView.Nodes[1].Nodes.Count - 1] && e.Label != "Добавить тег")
+            {
+                SQLiteCommand command = new SQLiteCommand("INSERT INTO tags(name) VALUES (@name)", connection);
+                command.Parameters.AddWithValue("@name", e.Label);
+                command.ExecuteNonQuery();
+                loadTreeView();
+            }
+            else if (e.Label != null && treeView.Nodes.Count > 1 && treeView.Nodes[1].Nodes.Contains(e.Node) && e.Label != "Добавить тег")
+            {
+                SQLiteCommand command = new SQLiteCommand("UPDATE tags SET name=@name WHERE id=@id", connection);
+                command.Parameters.AddWithValue("@name", e.Label);
+                command.Parameters.AddWithValue("@id", e.Node.Tag);
+                command.ExecuteNonQuery();
+                loadTreeView();
+            }
+        }
+
+        private void treeView_BeforeLabelEdit(object sender, NodeLabelEditEventArgs e)
+        {
+            if (e.Node.Level == 0)
+                e.CancelEdit = true;
+        }
+
+        private void treeView_NodeMouseDoubleClick(object sender, TreeNodeMouseClickEventArgs e)
+        {
+            e.Node.BeginEdit();
+        }
+
+        private void contextMenuStrip_Opening(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            contextMenuStrip.Items.Clear();
+            SQLiteDataReader reader = new SQLiteCommand("SELECT * FROM tags", connection).ExecuteReader();
+            while (reader.Read())
+            {
+                ToolStripMenuItem item = new ToolStripMenuItem(reader["name"].ToString());
+                item.Tag = Int32.Parse(reader["id"].ToString());
+                if (activeTags.Contains((Int32)item.Tag))
+                {
+                    item.BackColor = Color.LightGreen;
+                }
+                else 
+                {
+                    item.BackColor = Color.White;
+                }
+                contextMenuStrip.Items.Add(item);
+            }
+                
+        }
+
+        private void contextMenuStrip_ItemClicked(object sender, ToolStripItemClickedEventArgs e)
+        {
+            if (activeTags.Contains((Int32)e.ClickedItem.Tag))
+            {
+                activeTags.Remove((Int32)e.ClickedItem.Tag);
+                e.ClickedItem.BackColor = Color.White;
+            }
+            else
+            {
+                activeTags.Add((Int32)e.ClickedItem.Tag);
+                e.ClickedItem.BackColor = Color.LightGreen;
+            }
+        }
+
+        private void treeView_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Delete && treeView.Nodes.Count > 1 && treeView.Nodes[1].Nodes.Contains(treeView.SelectedNode))
+            {
+                SQLiteCommand command = new SQLiteCommand("DELETE FROM tags WHERE id=@id", connection);
+                command.Parameters.AddWithValue("@id", treeView.SelectedNode.Tag);
+                command.ExecuteNonQuery();
+                loadTreeView();
+                loadList();
+            }
+        }
+
+        private void treeView_AfterCheck(object sender, TreeViewEventArgs e)
+        {
+            loadList();
+        }
+
+        private void dateToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.dateRowDisplaying = dateToolStripMenuItem.Checked;
+            dataGridView.Columns["date"].Visible = dateToolStripMenuItem.Checked;
+            Properties.Settings.Default.Save();
+        }
+
+        private void tagsToolStripMenuItem_CheckedChanged(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.tagsRowDisplaying = tagsToolStripMenuItem.Checked;
+            dataGridView.Columns["tags"].Visible = tagsToolStripMenuItem.Checked;
+            Properties.Settings.Default.Save();
+        }
+
+        
     }
 }

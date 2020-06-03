@@ -97,6 +97,7 @@
     <Compile Include="textAdd.Designer.cs">
       <DependentUpon>textAdd.cs</DependentUpon>
     </Compile>
+    <Compile Include="TreeViewExtensions.cs" />
     <EmbeddedResource Include="main.resx">
       <DependentUpon>main.cs</DependentUpon>
     </EmbeddedResource>
