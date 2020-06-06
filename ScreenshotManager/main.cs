@@ -7,7 +7,7 @@ using System.Data.SQLite;
 using System.IO;
 using NAudio.Wave;
 using System.Diagnostics;
-using System.Data.Entity.Core.Metadata.Edm;
+using System.Collections.Specialized;
 
 namespace ScreenshotManager
 {
@@ -81,9 +81,10 @@ namespace ScreenshotManager
             tagsToolStripMenuItem.Checked = Properties.Settings.Default.tagsRowDisplaying;
 
             gkhInstall();
+            loadTreeView();
+            loadContextMenuStripItems();
             if (Properties.Settings.Default.startInTray)
                 return;
-            loadTreeView();
             loadList();
         }
 
@@ -144,6 +145,18 @@ namespace ScreenshotManager
         private void loadTreeView()
         {
             activeTags.Clear();
+            foreach (string item in Properties.Settings.Default.activeTags)
+            {
+                SQLiteCommand checkTag = new SQLiteCommand("SELECT 1 FROM tags WHERE id=@id", connection);
+                checkTag.Parameters.AddWithValue("@id", Int32.Parse(item));
+                SQLiteDataReader checkReader = checkTag.ExecuteReader();
+                if (checkReader.Read())
+                    activeTags.Add(Int32.Parse(item));
+            }
+            Properties.Settings.Default.activeTags.Clear();
+            Properties.Settings.Default.activeTags.AddRange(activeTags.ConvertAll<string>(delegate (int i) { return i.ToString(); }).ToArray());
+            Properties.Settings.Default.Save();
+
             treeView.Nodes.Clear();
             treeView.CheckBoxes = true;
             TreeNode node = new TreeNode("Тип");
@@ -248,6 +261,7 @@ namespace ScreenshotManager
             if (turnOn)
             {
                 this.Hide();
+                refreshTimer.Stop();
                 this.WindowState = FormWindowState.Minimized;
                 for (int i = 0; i < dataGridView.Rows.Count; i++)
                 {
@@ -257,8 +271,10 @@ namespace ScreenshotManager
                 GC.Collect(1, GCCollectionMode.Forced);
             }
             else {
+                refreshTimer.Start();
                 this.Show();
                 this.WindowState = FormWindowState.Normal;
+                this.Activate();
                 loadList();
             }
         }
@@ -455,7 +471,9 @@ namespace ScreenshotManager
 
         private void dataGridView_CellMouseClick(object sender, DataGridViewCellMouseEventArgs e)
         {
-            if (Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 2 && dataGridView.Columns[e.ColumnIndex].Name == "content") {
+            if (e.RowIndex == -1)
+                return;
+            if (e.Button == MouseButtons.Left && Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 2 && dataGridView.Columns[e.ColumnIndex].Name == "content") {
                 if (audioWritting)
                 {
                     MessageBox.Show("Завершите запись аудио перед началом воспроизведения");
@@ -468,11 +486,13 @@ namespace ScreenshotManager
 
         private void dataGridView_CellMouseDoubleClick(object sender, DataGridViewCellMouseEventArgs e)
         {
-            if ((Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 0 || Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 1) && dataGridView.Columns[e.ColumnIndex].Name == "content")
+            if (e.RowIndex == -1)
+                return;
+            if (e.Button == MouseButtons.Left && (Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 0 || Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 1) && dataGridView.Columns[e.ColumnIndex].Name == "content")
             {
                 Process.Start(dataGridView.Rows[e.RowIndex].Cells["path"].Value.ToString());
             }
-            if (Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 2 && dataGridView.Columns[e.ColumnIndex].Name == "content")
+            if (e.Button == MouseButtons.Left && Int32.Parse(dataGridView.Rows[e.RowIndex].Cells["type"].Value.ToString()) == 2 && dataGridView.Columns[e.ColumnIndex].Name == "content")
             {
                 if (audioWritting)
                 {
@@ -552,36 +572,91 @@ namespace ScreenshotManager
 
         private void contextMenuStrip_Opening(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            loadContextMenuStripItems();
+        }
+
+        private void loadContextMenuStripItems()
+        {
             contextMenuStrip.Items.Clear();
+
+            ToolStripMenuItem item = new ToolStripMenuItem("Полный скриншот");
+            item.Tag = -1;
+            contextMenuStrip.Items.Add(item);
+            item = new ToolStripMenuItem("Текстовая заметка");
+            item.Tag = -2;
+            contextMenuStrip.Items.Add(item);
+            if (!audioWritting)
+                item = new ToolStripMenuItem("Записать аудио заметку");
+            else
+                item = new ToolStripMenuItem("Остановить запись аудио заметки");
+            item.Tag = -3;
+            contextMenuStrip.Items.Add(item);
+            contextMenuStrip.Items.Add(new ToolStripSeparator());
+            item = new ToolStripMenuItem("Теги:");
+            item.Tag = -255;
+            contextMenuStrip.Items.Add(item);
+
             SQLiteDataReader reader = new SQLiteCommand("SELECT * FROM tags", connection).ExecuteReader();
             while (reader.Read())
             {
-                ToolStripMenuItem item = new ToolStripMenuItem(reader["name"].ToString());
+                item = new ToolStripMenuItem(reader["name"].ToString());
                 item.Tag = Int32.Parse(reader["id"].ToString());
                 if (activeTags.Contains((Int32)item.Tag))
                 {
                     item.BackColor = Color.LightGreen;
                 }
-                else 
+                else
                 {
                     item.BackColor = Color.White;
                 }
                 contextMenuStrip.Items.Add(item);
             }
-                
+
+            contextMenuStrip.Items.Add(new ToolStripSeparator());
+            item = new ToolStripMenuItem("Выход");
+            item.Tag = -4;
+            contextMenuStrip.Items.Add(item);
         }
 
         private void contextMenuStrip_ItemClicked(object sender, ToolStripItemClickedEventArgs e)
         {
-            if (activeTags.Contains((Int32)e.ClickedItem.Tag))
+            if ((Int32)e.ClickedItem.Tag > 0)
             {
-                activeTags.Remove((Int32)e.ClickedItem.Tag);
-                e.ClickedItem.BackColor = Color.White;
+                if (activeTags.Contains((Int32)e.ClickedItem.Tag))
+                {
+                    activeTags.Remove((Int32)e.ClickedItem.Tag);
+                    Properties.Settings.Default.activeTags.Clear();
+                    Properties.Settings.Default.activeTags.AddRange(activeTags.ConvertAll<string>(delegate (int i) { return i.ToString(); }).ToArray());
+                    Properties.Settings.Default.Save();
+                    e.ClickedItem.BackColor = Color.White;
+                }
+                else
+                {
+                    activeTags.Add((Int32)e.ClickedItem.Tag);
+                    Properties.Settings.Default.activeTags.Clear();
+                    Properties.Settings.Default.activeTags.AddRange(activeTags.ConvertAll<string>(delegate (int i) { return i.ToString(); }).ToArray());
+                    Properties.Settings.Default.Save();
+                    e.ClickedItem.BackColor = Color.LightGreen;
+                }
             }
             else
             {
-                activeTags.Add((Int32)e.ClickedItem.Tag);
-                e.ClickedItem.BackColor = Color.LightGreen;
+                switch ((Int32)e.ClickedItem.Tag)
+                {
+                    case -1:
+                        contextMenuStrip.Close();
+                        createFullScreenshot();
+                        break;
+                    case -2:
+                        addText();
+                        break;
+                    case -3:
+                        audioTrigger();
+                        break;
+                    case -4:
+                        Application.Exit();
+                        break;
+                }
             }
         }
 

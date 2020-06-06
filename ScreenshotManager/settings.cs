@@ -131,6 +131,8 @@ namespace ScreenshotManager
                         del.ExecuteNonQuery();
                     }
                 }
+                SQLiteCommand vacuum = new SQLiteCommand("VACUUM", connection);
+                vacuum.ExecuteNonQuery();
                 Application.Restart();
             }
         }
@@ -139,7 +141,7 @@ namespace ScreenshotManager
         {
             if (MessageBox.Show("Вы уверенны, что хотите сбросить хранилище?\r\nПриложение будет перезапущено.", "Сброс настроек", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
             {
-                SQLiteCommand del = new SQLiteCommand("DELETE FROM files", connection);
+                SQLiteCommand del = new SQLiteCommand("DELETE FROM files; DELETE FROM tags; DELETE FROM tagsForFile; VACUUM", connection);
                 del.ExecuteNonQuery();
                 Application.Restart();
             }
@@ -150,8 +152,8 @@ namespace ScreenshotManager
             if (MessageBox.Show("Вы уверенны, что хотите сбросить настройки?", "Сброс настроек", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes) {
                 Properties.Settings.Default.Reset();
                 this.Close();
+                Application.Restart();
             }
-            Application.Restart();
         }
 
         private void imageFormatComboBox_SelectedIndexChanged(object sender, EventArgs e)
