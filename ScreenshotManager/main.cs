@@ -482,6 +482,9 @@ namespace ScreenshotManager
 
                 Process.Start(dataGridView.Rows[e.RowIndex].Cells["path"].Value.ToString());
             }
+
+            if (e.Button == MouseButtons.Right && dataGridView.Columns[e.ColumnIndex].Name == "content")
+                Process.Start(new ProcessStartInfo {FileName = "explorer", Arguments = $"/n, /select, {dataGridView.Rows[e.RowIndex].Cells["path"].Value}" });
         }
 
         private void dataGridView_CellMouseDoubleClick(object sender, DataGridViewCellMouseEventArgs e)
