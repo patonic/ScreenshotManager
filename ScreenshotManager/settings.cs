@@ -80,8 +80,6 @@ namespace ScreenshotManager
             }
             Properties.Settings.Default.startInTray = startInTrayCheckBox.Checked;
 
-
-
             Properties.Settings.Default.fullScreenshotShift = fullScreenshotShiftCheckBox.Checked;
             Properties.Settings.Default.fullScreenshotCtrl = fullScreenshotCtrlСheckBox.Checked;
             Properties.Settings.Default.fullScreenshotAlt = fullScreenshotAltСheckBox.Checked;
