@@ -138,6 +138,9 @@ namespace ScreenshotManager
 
         private void copyPathToolStripButton_Click(object sender, EventArgs e)
         {
+            if (dataGridView.SelectedRows.Count == 0)
+                return;
+
             Clipboard.SetDataObject(dataGridView.SelectedRows[0].Cells["path"].Value);
         }
         #endregion
